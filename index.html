@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Personal Project Dashboard</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #121212;
+            color: #ffffff;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            box-sizing: border-box;
+        }
+
+        h1 {
+            font-size: 24px;
+            margin-bottom: 5px;
+            text-align: center;
+            font-weight: 600;
+        }
+
+        p.subtitle {
+            color: #8e8e93;
+            font-size: 14px;
+            margin-bottom: 30px;
+            text-align: center;
+        }
+
+        .container {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .card {
+            background-color: #1c1c1e;
+            border: 1px solid #2c2c2e;
+            border-radius: 12px;
+            padding: 20px;
+            text-decoration: none;
+            color: #ffffff;
+            transition: transform 0.2s ease, background-color 0.2s ease;
+            display: block;
+        }
+
+        /* Adds a subtle native iOS tap animation effect */
+        .card:active {
+            transform: scale(0.98);
+            background-color: #2c2c2e;
+        }
+
+        .card-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin: 0 0 6px 0;
+            color: #007aff; /* Apple Blue */
+        }
+
+        .card-title.alt {
+            color: #34c759; /* Apple Green */
+        }
+
+        .card-desc {
+            font-size: 14px;
+            color: #aeaeae;
+            margin: 0;
+            line-height: 1.4;
+        }
+    </style>
+</head>
+<body>
+
+    <h1>Current Project: Nail Art Trace Tools</h1>
+    <p class="subtitle">I have two versions to play with, using these early examples to plan my own web app.</p>
+
+    <div class="container">
+        
+        <a href="nail-art-tracer.html" class="card">
+            <p class="card-title">Option 1: Minimal Touch Function</p>
+            <p class="card-desc">Features scaling, rotation, mirroring, and a lock/double-tap-unlock function.</p>
+        </a>
+
+        <a href="nail-decal-tracer.html" class="card">
+            <p class="card-title alt">Option 2: More Touch Function</p>
+            <p class="card-desc">Features more touchscreen function, but still includes scaling, rotation, mirroring, and some screen features.</p>
+        </a>
+
+    </div>
+
+</body>
+</html>
