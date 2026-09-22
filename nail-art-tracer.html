@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Nail Art Trace</title>
+    <style>
+        body {
+            font-family: -apple-system, sans-serif;
+            margin: 0; padding: 15px;
+            background: #111; color: #fff;
+            overflow: hidden; height: 100vh; box-sizing: border-box;
+        }
+        #ui {
+            background: #222; padding: 15px; border-radius: 12px;
+            display: flex; flex-direction: column; gap: 12px;
+            position: relative; z-index: 10;
+        }
+        .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+        label, button {
+            background: #007aff; color: white; border: none;
+            padding: 10px 16px; border-radius: 8px; font-weight: bold;
+            font-size: 14px; cursor: pointer; text-align: center;
+        }
+        button.alt { background: #444; }
+        input[type="range"] { flex-grow: 1; accent-color: #007aff; }
+        #stage {
+            position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+            display: flex; align-items: center; justify-content: center; z-index: 1;
+        }
+        #img-view {
+            max-width: 90%; max-height: 70%;
+            transform-origin: center center;
+            transition: transform 0.05s linear;
+        }
+        #lock-screen {
+            display: none; position: fixed; top: 0; left: 0;
+            width: 100vw; height: 100vh; background: rgba(0,0,0,0.01); z-index: 9999;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui">
+        <div class="row">
+            <label for="picker">📥 Load Image</label>
+            <input type="file" id="picker" accept="image/*" style="display: none;">
+            <button class="alt" id="flip-btn">↔️ Flip</button>
+        </div>
+        <div class="row">
+            <span>Size:</span>
+            <input type="range" id="size-slide" min="10" max="300" value="100">
+        </div>
+        <div class="row">
+            <span>Rotate:</span>
+            <input type="range" id="rot-slide" min="0" max="360" value="0">
+        </div>
+        <button id="lock-btn" style="background: #34c759;">🔒 Lock Layout & Hide UI</button>
+    </div>
+
+    <div id="stage">
+        <img id="img-view" src="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><rect width='100' height='100' fill='%23222'/></svg>">
+    </div>
+
+    <div id="lock-screen"></div>
+
+    <script>
+        const picker = document.getElementById('picker');
+        const img = document.getElementById('img-view');
+        const sizeSlide = document.getElementById('size-slide');
+        const rotSlide = document.getElementById('rot-slide');
+        const flipBtn = document.getElementById('flip-btn');
+        const lockBtn = document.getElementById('lock-btn');
+        const ui = document.getElementById('ui');
+        const lockScreen = document.getElementById('lock-screen');
+
+        let scale = 1, rotation = 0, flipped = false;
+
+        picker.onchange = (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (evt) => { img.src = evt.target.result; };
+                reader.readAsDataURL(file);
+            }
+        };
+
+        function apply() {
+            img.style.transform = `scaleX(${flipped ? -1 : 1}) scale(${scale}) rotate(${rotation}deg)`;
+        }
+
+        sizeSlide.oninput = (e) => { scale = e.target.value / 100; apply(); };
+        rotSlide.oninput = (e) => { rotation = e.target.value; apply(); };
+        flipBtn.onclick = () => { flipped = !flipped; apply(); };
+        
+        lockBtn.onclick = () => { ui.style.display = 'none'; lockScreen.style.display = 'block'; };
+        lockScreen.ondblclick = () => { ui.style.display = 'flex'; lockScreen.style.display = 'none'; };
+    </script>
+</body>
+</html>

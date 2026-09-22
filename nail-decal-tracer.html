@@ -1,0 +1,604 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Decal Tracer</title>
+<style>
+  :root {
+    --ink: #241f2e;
+    --paper: #f6f1ea;
+    --lacquer: #b5455a;
+    --lacquer-dim: #d98a97;
+    --line: #ddd3c4;
+    --panel: #ffffff;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  * { box-sizing: border-box; }
+  html, body {
+    height: 100%;
+    margin: 0;
+    overscroll-behavior: none;
+  }
+  body {
+    background: var(--ink);
+    color: var(--paper);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    touch-action: none;
+  }
+
+  /* ---- Stage: where the image lives ---- */
+  #stage {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background:
+      repeating-linear-gradient(45deg, #2c2636 0 12px, #241f2e 12px 24px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  #emptyState {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 2rem;
+    text-align: center;
+    pointer-events: none;
+  }
+  #emptyState.hidden { display: none; }
+  #emptyState .msg {
+    color: var(--lacquer-dim);
+    font-size: 1.05rem;
+    line-height: 1.5;
+    max-width: 20rem;
+  }
+  #emptyState .msg strong {
+    display: block;
+    color: var(--paper);
+    font-size: 1.3rem;
+    margin-bottom: 0.5rem;
+    font-weight: 600;
+  }
+
+  #imgWrap {
+    position: absolute;
+    left: 0;
+    top: 0;
+    will-change: transform;
+    cursor: grab;
+    display: none;
+  }
+  #imgWrap.active { display: block; }
+  #imgWrap:active { cursor: grabbing; }
+  #imgWrap img {
+    display: block;
+    max-width: none;
+    -webkit-user-drag: none;
+    user-select: none;
+    pointer-events: none;
+  }
+
+  /* thin centered crosshair to help align under a form */
+  #crosshair {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.35;
+  }
+  #crosshair::before, #crosshair::after {
+    content: "";
+    position: absolute;
+    background: var(--lacquer-dim);
+  }
+  #crosshair::before { left: 50%; top: 0; bottom: 0; width: 1px; transform: translateX(-0.5px); }
+  #crosshair::after { top: 50%; left: 0; right: 0; height: 1px; transform: translateY(-0.5px); }
+
+  /* ---- Controls ---- */
+  #controls {
+    background: var(--paper);
+    color: var(--ink);
+    padding: 0.9rem 1rem calc(0.9rem + env(safe-area-inset-bottom, 0px));
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    border-top: 1px solid var(--line);
+  }
+
+  .sliderRow {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+  }
+  .sliderRow label {
+    width: 4.2rem;
+    flex-shrink: 0;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--ink);
+  }
+  .sliderRow input[type="range"] {
+    flex: 1;
+    -webkit-appearance: none;
+    appearance: none;
+    height: 4px;
+    background: var(--line);
+    border-radius: 2px;
+    outline: none;
+  }
+  .sliderRow input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--lacquer);
+    border: 3px solid var(--paper);
+    box-shadow: 0 0 0 1px var(--lacquer);
+  }
+  .sliderRow input[type="range"]::-moz-range-thumb {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    background: var(--lacquer);
+    border: 3px solid var(--paper);
+    box-shadow: 0 0 0 1px var(--lacquer);
+  }
+  .sliderRow .val {
+    width: 3.4rem;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+    font-size: 0.85rem;
+    color: #6b6472;
+    flex-shrink: 0;
+  }
+
+  #buttonRow {
+    display: flex;
+    gap: 0.6rem;
+    margin-top: 0.15rem;
+  }
+  #buttonRow button {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    padding: 0.65rem 0.4rem;
+    border: 1px solid var(--line);
+    background: var(--panel);
+    color: var(--ink);
+    border-radius: 12px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  #buttonRow button:active {
+    background: var(--line);
+  }
+  #buttonRow button svg {
+    width: 20px;
+    height: 20px;
+    stroke: var(--ink);
+  }
+  #buttonRow button.primary {
+    background: var(--lacquer);
+    border-color: var(--lacquer);
+  }
+  #buttonRow button.primary, #buttonRow button.primary svg {
+    color: var(--paper);
+    stroke: var(--paper);
+  }
+  #buttonRow button.on {
+    background: var(--ink);
+    border-color: var(--ink);
+  }
+  #buttonRow button.on, #buttonRow button.on svg {
+    color: var(--paper);
+    stroke: var(--paper);
+  }
+  #buttonRow button.locked-out, .sliderRow.locked-out {
+    opacity: 0.4;
+    pointer-events: none;
+  }
+  #imgWrap.locked {
+    cursor: default;
+  }
+
+  #fileInput { display: none; }
+
+  #hint {
+    text-align: center;
+    font-size: 0.72rem;
+    color: #928c99;
+    margin-top: -0.2rem;
+  }
+</style>
+</head>
+<body>
+
+  <div id="stage">
+    <div id="emptyState">
+      <div class="msg">
+        <strong>Import a design</strong>
+        Tap "Add image" below, then scale, rotate, or flip it to fit under your nail form.
+      </div>
+    </div>
+    <div id="crosshair"></div>
+    <div id="imgWrap">
+      <img id="theImage" alt="Imported design">
+    </div>
+  </div>
+
+  <div id="controls">
+    <div class="sliderRow" id="scaleRow">
+      <label for="scaleSlider">Scale</label>
+      <input type="range" id="scaleSlider" min="10" max="400" value="100" step="1">
+      <span class="val" id="scaleVal">100%</span>
+    </div>
+    <div class="sliderRow" id="rotateRow">
+      <label for="rotateSlider">Rotate</label>
+      <input type="range" id="rotateSlider" min="-180" max="180" value="0" step="1">
+      <span class="val" id="rotateVal">0°</span>
+    </div>
+
+    <div id="buttonRow">
+      <button id="addBtn" class="primary" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/><path d="M7 9l5-5 5 5"/><path d="M12 4v12"/></svg>
+        Add image
+      </button>
+      <button id="flipBtn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v18"/><path d="M16 7l4 5-4 5"/><path d="M8 7l-4 5 4 5"/></svg>
+        Flip
+      </button>
+      <button id="centerBtn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v4M12 18v4M2 12h4M18 12h4"/></svg>
+        Center
+      </button>
+      <button id="resetBtn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/></svg>
+        Reset
+      </button>
+      <button id="wakeBtn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.36 6.36l-.7-.7M6.34 6.34l-.7-.7m12.72 0l-.7.7M6.34 17.66l-.7.7"/><circle cx="12" cy="12" r="4"/></svg>
+        <span id="wakeLabel">Keep awake</span>
+      </button>
+      <button id="lockBtn" type="button">
+        <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+        <span id="lockLabel">Lock</span>
+      </button>
+    </div>
+    <div id="hint">Drag the image to reposition it • pinch or use the slider to scale</div>
+  </div>
+
+  <input type="file" id="fileInput" accept="image/*">
+
+  <script>
+    (function () {
+      const stage = document.getElementById('stage');
+      const imgWrap = document.getElementById('imgWrap');
+      const img = document.getElementById('theImage');
+      const emptyState = document.getElementById('emptyState');
+      const fileInput = document.getElementById('fileInput');
+
+      const scaleSlider = document.getElementById('scaleSlider');
+      const rotateSlider = document.getElementById('rotateSlider');
+      const scaleVal = document.getElementById('scaleVal');
+      const rotateVal = document.getElementById('rotateVal');
+
+      const addBtn = document.getElementById('addBtn');
+      const flipBtn = document.getElementById('flipBtn');
+      const centerBtn = document.getElementById('centerBtn');
+      const resetBtn = document.getElementById('resetBtn');
+      const wakeBtn = document.getElementById('wakeBtn');
+      const wakeLabel = document.getElementById('wakeLabel');
+      const lockBtn = document.getElementById('lockBtn');
+      const lockLabel = document.getElementById('lockLabel');
+      const scaleRow = document.getElementById('scaleRow');
+      const rotateRow = document.getElementById('rotateRow');
+
+      let locked = false;
+
+      function setLocked(next) {
+        locked = next;
+        imgWrap.classList.toggle('locked', locked);
+        lockBtn.classList.toggle('on', locked);
+        lockLabel.textContent = locked ? 'Unlock' : 'Lock';
+        [flipBtn, centerBtn, resetBtn].forEach(b => b.classList.toggle('locked-out', locked));
+        [scaleRow, rotateRow].forEach(r => r.classList.toggle('locked-out', locked));
+      }
+
+      lockBtn.addEventListener('click', () => {
+        if (!hasImage) return;
+        setLocked(!locked);
+      });
+
+      // --- Keep screen awake ---
+      let wakeLock = null;
+      let wakeWanted = false;
+      const wakeLockSupported = 'wakeLock' in navigator;
+
+      async function requestWakeLock() {
+        if (!wakeLockSupported) return;
+        try {
+          wakeLock = await navigator.wakeLock.request('screen');
+          wakeLock.addEventListener('release', () => {
+            // Released by the system (e.g. tab hidden). UI stays "on"
+            // if the user still wants it; it's reacquired on visibilitychange.
+          });
+        } catch (err) {
+          // Request can fail (e.g. low battery, backgrounded). Silently ignore;
+          // it will retry on the next visibility change.
+        }
+      }
+
+      function releaseWakeLock() {
+        if (wakeLock) {
+          wakeLock.release().catch(() => {});
+          wakeLock = null;
+        }
+      }
+
+      wakeBtn.addEventListener('click', async () => {
+        if (!wakeLockSupported) {
+          wakeLabel.textContent = 'Not supported here';
+          setTimeout(() => { wakeLabel.textContent = 'Keep awake'; }, 2000);
+          return;
+        }
+        wakeWanted = !wakeWanted;
+        if (wakeWanted) {
+          await requestWakeLock();
+          wakeBtn.classList.add('on');
+          wakeLabel.textContent = 'Awake: on';
+        } else {
+          releaseWakeLock();
+          wakeBtn.classList.remove('on');
+          wakeLabel.textContent = 'Keep awake';
+        }
+      });
+
+      document.addEventListener('visibilitychange', () => {
+        if (wakeWanted && document.visibilityState === 'visible') {
+          requestWakeLock();
+        }
+      });
+
+      // Transform state
+      let state = {
+        x: 0, y: 0,       // top-left position within stage, in px
+        scale: 1,
+        rotation: 0,      // degrees
+        flipped: false,
+        naturalW: 0,
+        naturalH: 0
+      };
+
+      let hasImage = false;
+
+      function applyTransform() {
+        const flipX = state.flipped ? -1 : 1;
+        imgWrap.style.transform =
+          `translate(${state.x}px, ${state.y}px) rotate(${state.rotation}deg) scale(${flipX * state.scale}, ${state.scale})`;
+      }
+
+      function centerImage() {
+        if (!hasImage) return;
+        const stageRect = stage.getBoundingClientRect();
+        const w = state.naturalW * state.scale;
+        const h = state.naturalH * state.scale;
+        state.x = (stageRect.width - w) / 2 + w / 2 - state.naturalW / 2;
+        state.y = (stageRect.height - h) / 2 + h / 2 - state.naturalH / 2;
+        // Simpler: position so the image's center sits at stage center.
+        // imgWrap origin is top-left of the (unscaled) image, transform-origin center handled below.
+        applyTransform();
+      }
+
+      function loadImage(file) {
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          img.onload = function () {
+            state.naturalW = img.naturalWidth;
+            state.naturalH = img.naturalHeight;
+            img.style.width = state.naturalW + 'px';
+            img.style.height = state.naturalH + 'px';
+            imgWrap.style.width = state.naturalW + 'px';
+            imgWrap.style.height = state.naturalH + 'px';
+            imgWrap.style.transformOrigin = 'center center';
+            imgWrap.style.marginLeft = (-state.naturalW / 2) + 'px';
+            imgWrap.style.marginTop = (-state.naturalH / 2) + 'px';
+
+            // Fit initial scale so the image starts reasonably sized on stage
+            const stageRect = stage.getBoundingClientRect();
+            const fitScale = Math.min(
+              (stageRect.width * 0.7) / state.naturalW,
+              (stageRect.height * 0.7) / state.naturalH,
+              1
+            );
+            state.scale = fitScale > 0 ? fitScale : 1;
+            state.rotation = 0;
+            state.flipped = false;
+
+            scaleSlider.value = Math.round(state.scale * 100);
+            rotateSlider.value = 0;
+            scaleVal.textContent = Math.round(state.scale * 100) + '%';
+            rotateVal.textContent = '0°';
+
+            // position: place top-left of imgWrap at stage center
+            state.x = stageRect.width / 2;
+            state.y = stageRect.height / 2;
+
+            imgWrap.classList.add('active');
+            emptyState.classList.add('hidden');
+            hasImage = true;
+            setLocked(false);
+            applyTransform();
+          };
+          img.src = e.target.result;
+        };
+        reader.readAsDataURL(file);
+      }
+
+      addBtn.addEventListener('click', () => fileInput.click());
+      fileInput.addEventListener('change', (e) => {
+        if (e.target.files && e.target.files[0]) {
+          loadImage(e.target.files[0]);
+        }
+        fileInput.value = '';
+      });
+
+      flipBtn.addEventListener('click', () => {
+        if (!hasImage) return;
+        state.flipped = !state.flipped;
+        applyTransform();
+      });
+
+      centerBtn.addEventListener('click', () => {
+        if (!hasImage) return;
+        const stageRect = stage.getBoundingClientRect();
+        state.x = stageRect.width / 2;
+        state.y = stageRect.height / 2;
+        applyTransform();
+      });
+
+      resetBtn.addEventListener('click', () => {
+        if (!hasImage) return;
+        const stageRect = stage.getBoundingClientRect();
+        const fitScale = Math.min(
+          (stageRect.width * 0.7) / state.naturalW,
+          (stageRect.height * 0.7) / state.naturalH,
+          1
+        );
+        state.scale = fitScale > 0 ? fitScale : 1;
+        state.rotation = 0;
+        state.flipped = false;
+        state.x = stageRect.width / 2;
+        state.y = stageRect.height / 2;
+        scaleSlider.value = Math.round(state.scale * 100);
+        rotateSlider.value = 0;
+        scaleVal.textContent = Math.round(state.scale * 100) + '%';
+        rotateVal.textContent = '0°';
+        applyTransform();
+      });
+
+      scaleSlider.addEventListener('input', () => {
+        state.scale = parseFloat(scaleSlider.value) / 100;
+        scaleVal.textContent = scaleSlider.value + '%';
+        applyTransform();
+      });
+
+      rotateSlider.addEventListener('input', () => {
+        state.rotation = parseFloat(rotateSlider.value);
+        rotateVal.textContent = rotateSlider.value + '°';
+        applyTransform();
+      });
+
+      // --- Drag to reposition ---
+      let dragging = false;
+      let dragStart = { x: 0, y: 0, sx: 0, sy: 0 };
+
+      function pointerDown(clientX, clientY) {
+        if (!hasImage || locked) return;
+        dragging = true;
+        dragStart = { x: clientX, y: clientY, sx: state.x, sy: state.y };
+        imgWrap.style.cursor = 'grabbing';
+      }
+      function pointerMove(clientX, clientY) {
+        if (!dragging) return;
+        state.x = dragStart.sx + (clientX - dragStart.x);
+        state.y = dragStart.sy + (clientY - dragStart.y);
+        applyTransform();
+      }
+      function pointerUp() {
+        dragging = false;
+        imgWrap.style.cursor = 'grab';
+      }
+
+      // Mouse
+      imgWrap.addEventListener('mousedown', (e) => {
+        e.preventDefault();
+        pointerDown(e.clientX, e.clientY);
+      });
+      window.addEventListener('mousemove', (e) => pointerMove(e.clientX, e.clientY));
+      window.addEventListener('mouseup', pointerUp);
+
+      // Touch: single finger drag, two finger pinch-to-scale + rotate
+      let pinchStart = null;
+
+      function touchDist(t0, t1) {
+        return Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      }
+      function touchAngle(t0, t1) {
+        return Math.atan2(t1.clientY - t0.clientY, t1.clientX - t0.clientX) * 180 / Math.PI;
+      }
+
+      imgWrap.addEventListener('touchstart', (e) => {
+        if (!hasImage || locked) return;
+        e.preventDefault();
+        if (e.touches.length === 1) {
+          pointerDown(e.touches[0].clientX, e.touches[0].clientY);
+        } else if (e.touches.length === 2) {
+          dragging = false;
+          pinchStart = {
+            dist: touchDist(e.touches[0], e.touches[1]),
+            angle: touchAngle(e.touches[0], e.touches[1]),
+            scale: state.scale,
+            rotation: state.rotation
+          };
+        }
+      }, { passive: false });
+
+      imgWrap.addEventListener('touchmove', (e) => {
+        if (!hasImage || locked) return;
+        e.preventDefault();
+        if (e.touches.length === 1 && dragging) {
+          pointerMove(e.touches[0].clientX, e.touches[0].clientY);
+        } else if (e.touches.length === 2 && pinchStart) {
+          const newDist = touchDist(e.touches[0], e.touches[1]);
+          const newAngle = touchAngle(e.touches[0], e.touches[1]);
+          const scaleFactor = newDist / pinchStart.dist;
+          state.scale = Math.max(0.1, Math.min(4, pinchStart.scale * scaleFactor));
+          state.rotation = pinchStart.rotation + (newAngle - pinchStart.angle);
+          // normalize rotation to -180..180 for the slider
+          let r = state.rotation % 360;
+          if (r > 180) r -= 360;
+          if (r < -180) r += 360;
+          scaleSlider.value = Math.round(state.scale * 100);
+          rotateSlider.value = Math.round(r);
+          scaleVal.textContent = Math.round(state.scale * 100) + '%';
+          rotateVal.textContent = Math.round(r) + '°';
+          applyTransform();
+        }
+      }, { passive: false });
+
+      imgWrap.addEventListener('touchend', (e) => {
+        if (e.touches.length === 0) {
+          pointerUp();
+          pinchStart = null;
+        } else if (e.touches.length === 1) {
+          pinchStart = null;
+          pointerDown(e.touches[0].clientX, e.touches[0].clientY);
+        }
+      });
+
+      // Reposition sensibly on resize/orientation change
+      window.addEventListener('resize', () => {
+        if (hasImage) {
+          const stageRect = stage.getBoundingClientRect();
+          state.x = Math.min(Math.max(state.x, 0), stageRect.width);
+          state.y = Math.min(Math.max(state.y, 0), stageRect.height);
+          applyTransform();
+        }
+      });
+    })();
+  </script>
+</body>
+</html>
